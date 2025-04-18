@@ -2,11 +2,11 @@
 
 # This script takes a list of PDB IDs and generates a Quiver file from them
 
-# Usage: qvfrompdbs <pdb1> <pdb2> ... <pdbN> > mydesigns.qv
+# Usage: qvfrompdbs.sh <pdb1> <pdb2> ... <pdbN> > mydesigns.qv
 
 # Parse arguments
 if [ $# -lt 1 ]; then
-    echo "Usage: qvfrompdbs <pdb1> <pdb2> ... <pdbN> > mydesigns.qv" >&2
+    echo "Usage: qvfrompdbs.sh <pdb1> <pdb2> ... <pdbN> > mydesigns.qv" >&2
     exit 1
 fi
 
