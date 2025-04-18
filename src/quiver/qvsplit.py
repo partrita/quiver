@@ -1,42 +1,45 @@
 #!/usr/bin/env python3
 """
-This is a command-line tool to slice a specific set of tags from a Quiver file
-into another Quiver file.
+Split a Quiver (.qv) file into multiple smaller Quiver files,
+each containing a specified number of tags.
 
 Usage:
-    qvslice.py big.qv <tag1> <tag2> ... <tagN> > smaller.qv
+    qvsplit.py mydesigns.qv 100
+    → produces: split_000.qv, split_001.qv, ...
 """
 
-import os
-
+import click
 from quiver import Quiver
 
-import argparse
 
-
-def main():
+@click.command()
+@click.argument("file", type=click.Path(exists=True, dir_okay=False))
+@click.argument("ntags", type=int)
+@click.option(
+    "--prefix", default="split", help="Prefix for the output files (default: 'split')"
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, writable=True),
+    default=".",
+    help="Directory to save the split files (default: current directory)",
+)
+def qvsplit(file, ntags, prefix, output_dir):
     """
-    This is a command-line tool to split a Quiver file into multiple Quiver files
-    with a specified number of tags per file.
+    Split a Quiver FILE into multiple files, each with NTAGS tags.
     """
+    if ntags <= 0:
+        click.secho("❌ NTAGS must be a positive integer.", fg="red", err=True)
+        raise click.Abort()
 
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(
-        description="Split a Quiver file into multiple Quiver files with a specified number of tags per file."
-    )
-    parser.add_argument("file", metavar="FILE", type=str, help="Quiver file to split")
-    parser.add_argument(
-        "ntags", metavar="NTAGS", type=int, help="Number of tags per file"
-    )
+    click.secho(f"📂 Reading: {file}", fg="blue")
+    click.secho(f"🔪 Splitting into chunks of {ntags} tags...", fg="green")
 
-    args = parser.parse_args()
+    q = Quiver(file, "r")
+    q.split(ntags, output_dir, prefix)
 
-    # Open the Quiver file
-    q = Quiver(args.file, "r")
-
-    # Split the file
-    q.split(args.ntags, os.getcwd(), "split")
+    click.secho(f"✅ Files written to {output_dir} with prefix '{prefix}'", fg="green")
 
 
 if __name__ == "__main__":
-    main()
+    qvsplit()

@@ -7,35 +7,36 @@ Usage:
 """
 
 import os
-
+import click
 from quiver import Quiver
 
-import argparse
 
-
-def main():
-    # Parse the command-line arguments
-    parser = argparse.ArgumentParser(description="Extract PDB files from a Quiver file")
-    parser.add_argument("quiver_file", help="the Quiver file to extract PDB files from")
-
-    args = parser.parse_args()
-
-    qv = Quiver(args.quiver_file, "r")
+@click.command()
+@click.argument("quiver_file", type=click.Path(exists=True, dir_okay=False))
+def extract_pdbs(quiver_file):
+    """
+    Extract all PDB files from a Quiver file.
+    """
+    qv = Quiver(quiver_file, "r")
 
     for tag in qv.get_tags():
         outfn = f"{tag}.pdb"
 
         if os.path.exists(outfn):
-            print(f"File {outfn} already exists, skipping")
+            click.echo(f"⚠️  File {outfn} already exists, skipping")
             continue
 
         lines = qv.get_pdblines(tag)
         with open(outfn, "w") as f:
-            for line in lines:
-                f.write(line)
+            f.writelines(lines)
 
-    print(f"Successfully extracted {qv.size()} PDB files from {args.quiver_file}")
+        click.echo(f"✅ Extracted {outfn}")
+
+    click.secho(
+        f"\n🎉 Successfully extracted {qv.size()} PDB files from {quiver_file}",
+        fg="green",
+    )
 
 
 if __name__ == "__main__":
-    main()
+    extract_pdbs()
