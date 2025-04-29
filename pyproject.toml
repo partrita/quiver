@@ -1,10 +1,10 @@
 [project]
 name = "quiver-pdb"
-version = "0.1.0"
+version = "0.3.0"
 description = "Quiver files are simply one large file with the contents of many smaller files inside of them."
 readme = "README.md"
 authors = [
-    { name = "deepthought", email = "deepthough@postech.ac.kr" }
+    { name = "rabbitQ", email = "deepthough@postech.ac.kr" }
 ]
 requires-python = ">=3.11"
 dependencies = [

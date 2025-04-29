@@ -12,8 +12,7 @@ import os
 import math
 import uuid
 import pandas as pd
-
-
+from quiver import Quiver
 import glob
 
 # 현재 스크립트의 디렉토리
@@ -21,8 +20,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # 부모 디렉토리를 sys.path에 추가하여 상대 임포트 가능하게 함
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-
-from quiver import Quiver
 
 
 # Define a custom Exception class

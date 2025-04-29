@@ -85,7 +85,7 @@ def input_qv_file(basedir, tmp_path, input_pdb_files):
             # shell=True는 보안 위험이 있을 수 있으나, 여기서는 쉘 스크립트 실행 및 파일 목록 전달을 위해 사용
             # check=True는 명령 실패 시 예외 발생
             # stderr=subprocess.PIPE 추가하여 오류 메시지 캡처
-            result = subprocess.run(
+            subprocess.run(
                 cmd,
                 shell=True,
                 check=True,
@@ -151,7 +151,7 @@ def test_zip_and_extract(basedir, tmp_path, input_pdb_files):
     try:
         with open(qv_output_path, "w") as f_out:
             # shell=True로 실행, cwd는 tmp_path로 설정
-            result = subprocess.run(
+            subprocess.run(
                 zip_cmd,
                 shell=True,
                 check=True,

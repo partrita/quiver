@@ -1,10 +1,10 @@
 # Quiver
 
-This repository defines a type of file called a Quiver file. These files are simply one large file with the contents of many smaller files inside of them. Each entry has a unique name and can store meta_data about the entry.
+This repository introduces and defines a specialized file format known as a **Quiver file**. A Quiver file acts as a container that consolidates the contents of many individual files into a single, structured file. Each piece of data within a Quiver file is referred to as an **entry**, and every entry is uniquely identified by a name. Along with the actual file contents, each entry can also include **metadata**, such as file size, timestamps, tags, or other descriptive information relevant to the entry. This format enables efficient storage, organization, and retrieval of a large number of related files within a single archive-like structure.
 
-There are several command line tools in this repository as well which enable the manipulation of Quiver files with composable (pipe-able) commands.
+In addition to the file format itself, this repository provides a suite of **command-line tools** designed to interact with and manipulate Quiver files. These tools are built with a composable design philosophy in mind, meaning they are intended to be **pipe-able** and easily combined in Unix-style workflows. This allows users to construct complex data manipulation pipelines by chaining together simple commands, making the tools flexible and script-friendly.
 
-Quiver files and the different quiver tools are heavily influenced by Brian Coventry's silent_tools project. The difference is that Quiver files are able to work in environments outside of Rosetta which is very convenient.
+The concept and implementation of Quiver files and their associated tools are **heavily inspired by Brian Coventry’s _silent_tools_ project**, which serves a similar purpose for working with data within the Rosetta molecular modeling suite. However, a key distinction is that Quiver files are intentionally designed to be **platform-agnostic** and can be used in environments **outside of Rosetta**. This makes them especially valuable for more general-purpose data handling, sharing, and processing workflows across a broader range of scientific and software contexts.
 
 ## How to install
 
@@ -48,21 +48,35 @@ qvls my.qv | qvrename my.qv > uniq.qv
 # split a quiver file into groups of 100
 qvsplit my.qv 100
 
-# slice
+# slice a quiver file
 qvslice big.qv <tag1> <tag2> ... <tagN> > smaller.qv
 ```
 
-## 코드 테스트
+## Test
 
 터미널에서 이 파일이 있는 디렉토리 또는 상위 프로젝트 루트에서 다음 명령어를 실행하세요:
 
 ```bash
-pytest test_quiver_pytest.py
-# 또는 단순히 (pytest가 테스트를 자동으로 찾음)
-pytest
+uv run pytest
 ```
 
-## 할일
+## Benchmark
 
-- [x] pytest 파일 만들기
-- [ ] 코드 리팩토링하기
+
+```bash
+uv run python test/benchmark.py
+Time to create Quiver file: 0.2492 seconds
+Time to list tags: 0.0591 seconds
+Time to slice Quiver file (5 tags): 0.0610 seconds
+Time to extract from sliced Quiver file (5 files): 0.0267 seconds
+Time to extract all files (101 files): 0.9863 seconds
+```
+
+## Todo
+
+- [ ] Finding bottleneck.
+- [ ] rewrite the code more efficient.
+
+# References
+
+Thank you to Nathaniel Bennett for creating this original code(https://github.com/nrbennet/quiver).
