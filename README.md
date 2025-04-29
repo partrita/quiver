@@ -74,7 +74,7 @@ Time to extract all files (101 files): 0.9863 seconds
 
 ## Todo
 
-- [ ] Finding bottleneck.
+- [X] Finding bottleneck.
 - [ ] rewrite the code more efficient.
 
 # References
