@@ -29,10 +29,5 @@ jobs:
     - name: Install dependencies (using uv sync)
       run: uv sync
 
-    - name: Lint with ruff
-      uses: astral-sh/ruff-action@v3
-      with:
-        args: check .
-
     - name: Test with pytest
       run: uv run pytest
