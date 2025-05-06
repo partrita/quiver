@@ -6,10 +6,9 @@ Usage:
     qvslice.py big.qv tag1 tag2 ... > sliced.qv
     echo "tag1 tag2" | qvslice.py big.qv > sliced.qv
 """
-
 import sys
 import click
-from quiver import Quiver
+from quiver_pdb import qvslice as rust_qvslice  # Rust로 구현된 quiver_pdb 모듈 import
 
 
 @click.command()
@@ -37,17 +36,13 @@ def qvslice(quiver_file, tags):
         )
         sys.exit(1)
 
-    qv = Quiver(quiver_file, "r")
-    qv_lines, found_tags = qv.get_struct_list(tag_list)
-
-    # Warn about missing tags
-    missing_tags = [tag for tag in tag_list if tag not in found_tags]
-    for tag in missing_tags:
-        click.secho(f"⚠️  Tag not found in Quiver file: {tag}", fg="yellow", err=True)
-
-    # Output sliced content
-    click.echo(qv_lines, nl=False)
+    try:
+        rust_qvslice(quiver_file, tag_list)
+    except Exception as e:
+        click.secho(f"Error slicing Quiver file: {e}", fg="red", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     qvslice()
+

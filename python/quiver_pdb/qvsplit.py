@@ -9,7 +9,7 @@ Usage:
 """
 
 import click
-from quiver import Quiver
+from quiver_pdb import qvsplit as rust_qvsplit  # Rust로 구현된 quiver_pdb 모듈 import
 
 
 @click.command()
@@ -35,10 +35,11 @@ def qvsplit(file, ntags, prefix, output_dir):
     click.secho(f"📂 Reading: {file}", fg="blue")
     click.secho(f"🔪 Splitting into chunks of {ntags} tags...", fg="green")
 
-    q = Quiver(file, "r")
-    q.split(ntags, output_dir, prefix)
-
-    click.secho(f"✅ Files written to {output_dir} with prefix '{prefix}'", fg="green")
+    try:
+        rust_qvsplit(file, ntags, prefix, output_dir)
+    except Exception as e:
+        click.secho(f"Error splitting Quiver file: {e}", fg="red", err=True)
+        raise click.Abort()
 
 
 if __name__ == "__main__":

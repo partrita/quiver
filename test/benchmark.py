@@ -16,7 +16,7 @@ import shutil
 # 현재 스크립트의 디렉토리
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
-src_dir = os.path.join(parent_dir, "src")
+src_dir = os.path.join(parent_dir, "python")
 if os.path.isdir(src_dir):
     sys.path.insert(0, src_dir)
 else:
@@ -32,39 +32,34 @@ def measure_time(func, *args, **kwargs):
 
 
 def create_test_quiver_file(basedir, tmp_path, input_pdb_files):
-    """Creates a test Quiver file."""
+    """Creates a test Quiver file using qvfrompdb.py."""
     if not input_pdb_files:
         raise ValueError("No input PDB files found.")
 
     qv_path = tmp_path / "test_benchmark.qv"
-    pdb_files_list_str = " ".join(f'"{f}"' for f in input_pdb_files)
-    script_path = os.path.join(basedir, "src", "quiver", "qvfrompdbs.sh")
+    qvfrompdb_script = os.path.join(parent_dir, "python", "quiver_pdb", "qvfrompdb.py")
+    
+    if not os.path.exists(qvfrompdb_script):
+        raise FileNotFoundError(f"Script not found: {qvfrompdb_script}")
 
-    if not os.path.exists(script_path):
-        raise FileNotFoundError(f"Script not found: {script_path}")
-    if not os.access(script_path, os.X_OK):
-        raise PermissionError(f"Script is not executable: {script_path}")
-
-    cmd = f"{script_path} {pdb_files_list_str}"
+    cmd = [sys.executable, qvfrompdb_script] + input_pdb_files
     try:
         with open(qv_path, "w") as f_out:
             subprocess.run(
                 cmd,
-                shell=True,
                 check=True,
                 stdout=f_out,
                 stderr=subprocess.PIPE,
-                cwd=tmp_path,
                 text=True,
                 encoding="utf-8",
             )
     except subprocess.CalledProcessError as e:
-        print(f"Error running qvfrompdbs.sh: {e}")
+        print(f"Error running qvfrompdb.py: {e}")
         print(f"Stderr:\n{e.stderr}")
         raise
     except FileNotFoundError as e:
         raise FileNotFoundError(
-            f"Failed to run command. Is the script path correct and executable? {e}"
+            f"Failed to run command. Is the script path correct? {e}"
         )
 
     if not qv_path.exists() or qv_path.stat().st_size == 0:
@@ -74,7 +69,7 @@ def create_test_quiver_file(basedir, tmp_path, input_pdb_files):
 
 def list_quiver_tags(qv_file):
     """Lists tags from a Quiver file using qvls.py."""
-    qvls_script = os.path.join(parent_dir, "src", "quiver", "qvls.py")
+    qvls_script = os.path.join(parent_dir, "python", "quiver_pdb", "qvls.py")
     if not os.path.exists(qvls_script):
         raise FileNotFoundError(f"Script not found: {qvls_script}")
 
@@ -86,7 +81,7 @@ def list_quiver_tags(qv_file):
 
 def slice_quiver_file(input_qv_file, tags_to_slice, output_qv_file):
     """Slices a Quiver file using qvslice.py."""
-    slice_script = os.path.join(parent_dir, "src", "quiver", "qvslice.py")
+    slice_script = os.path.join(parent_dir, "python", "quiver_pdb", "qvslice.py")
     if not os.path.exists(slice_script):
         raise FileNotFoundError(f"Script not found: {slice_script}")
 
@@ -108,7 +103,7 @@ def slice_quiver_file(input_qv_file, tags_to_slice, output_qv_file):
 
 
 def extract_from_quiver(qv_file, output_dir):
-    extract_script = os.path.join(parent_dir, "src", "quiver", "qvextract.py")
+    extract_script = os.path.join(parent_dir, "python", "quiver_pdb", "qvextract.py")
     if not os.path.exists(extract_script):
         raise FileNotFoundError(f"Script not found: {extract_script}")
 

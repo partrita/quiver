@@ -62,6 +62,7 @@ uv run pytest
 
 ## Benchmark
 
+### pure python
 
 ```bash
 uv run python test/benchmark.py
@@ -71,11 +72,16 @@ Time to slice Quiver file (5 tags): 0.0610 seconds
 Time to extract from sliced Quiver file (5 files): 0.0267 seconds
 Time to extract all files (101 files): 0.9863 seconds
 ```
+### rusting version
 
-## Todo
-
-- [X] Finding bottleneck.
-- [ ] rewrite the code more efficient.
+```bash
+uv run python test/benchmark.py
+Time to create Quiver file: 0.0468 seconds
+Time to list tags: 0.0603 seconds
+Time to slice Quiver file (5 tags): 0.0962 seconds
+Time to extract from sliced Quiver file (5 files): 0.0281 seconds
+Time to extract all files (101 files): 0.4660 seconds
+```
 
 # References
 

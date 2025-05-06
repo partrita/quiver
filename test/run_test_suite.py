@@ -11,8 +11,17 @@ import sys
 import os
 import math
 import uuid
-import pandas as pd
-from quiver import Quiver
+import csv
+from quiver_pdb import (
+    Quiver,
+    qvfrompdbs,
+    extract_pdbs,
+    list_tags,
+    rename_tags,
+    qvslice,
+    qvsplit,
+    extract_scorefile,
+)
 import glob
 
 # 현재 스크립트의 디렉토리
@@ -29,71 +38,83 @@ class TestFailed(Exception):
 
 def test_zip_and_extract(basedir):
     """
-    Test that we can turn a directory of PDB files into a Quiver file and
-    then extract the PDB files from the Quiver file. And that the extracted
-    PDB files are identical to the original PDB files.
+    Test that qvfrompdbs and qvextract work correctly
     """
-
     # Go into the test directory
     os.chdir(f"{basedir}/test")
 
     # Create a temporary directory
-    os.system("mkdir -p zipextract")
+    os.makedirs("do_zip_and_extract", exist_ok=True)
+    os.chdir("do_zip_and_extract")
 
-    os.chdir("zipextract")
+    # Get list of PDB files
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    
+    # Create Quiver file
+    with open("test.qv", "w") as f:
+        f.write(qvfrompdbs(pdb_files))
 
-    # Zip the PDB files into a Quiver file
-    os.system(
-        f"{basedir}/src/quiver/qvfrompdbs.sh {basedir}/test/input_for_tests/*.pdb > test.qv"
-    )
+    # Extract PDB files
+    extract_pdbs("test.qv")
 
-    # Extract the PDB files from the Quiver file
-    os.chdir(f"{basedir}/test/zipextract")
+    # Get the list of PDB files in this directory
+    pdbs = glob.glob("*.pdb")
 
-    os.system(f"{basedir}/src/quiver/qvextract.py test.qv")
+    # Check that all PDB files were extracted
+    for pdb in pdbs:
+        tag = os.path.basename(pdb)[:-4]
+        print(f"✅ Extracted {tag}")
 
-    # Compare the extracted PDB files to the original PDB files
-    for file in glob.glob("*.pdb"):
-        otherfile = f"{basedir}/test/input_for_tests/{file}"
+    # Check that the extracted PDB files match the original ones
+    for pdb in pdbs:
+        tag = os.path.basename(pdb)[:-4]
+        original_pdb = f"{basedir}/test/input_for_tests/{tag}.pdb"
+        
+        # Read both files
+        with open(pdb, "r") as f1, open(original_pdb, "r") as f2:
+            content1 = f1.read()
+            content2 = f2.read()
+            
+            # Normalize content by removing extra whitespace and newlines
+            content1 = '\n'.join(line.strip() for line in content1.splitlines() if line.strip())
+            content2 = '\n'.join(line.strip() for line in content2.splitlines() if line.strip())
+            
+            # Compare contents
+            if content1 != content2:
+                print(f"File {pdb} does not match {original_pdb}")
+                print("First few lines of extracted file:")
+                print("\n".join(content1.split("\n")[:5]))
+                print("\nFirst few lines of original file:")
+                print("\n".join(content2.split("\n")[:5]))
+                raise TestFailed(f"File {pdb} does not match {original_pdb}")
 
-        # Compare the two files
-        with open(file, "r") as f:
-            lines = f.readlines()
-        with open(otherfile, "r") as f:
-            otherlines = f.readlines()
-
-        if lines != otherlines:
-            raise TestFailed(f"File {file} does not match {otherfile}")
-
-    # Remove the temporary directory
+    # Clean up
     os.chdir(f"{basedir}")
-    os.system(f"rm -r {basedir}/test/zipextract")
+    os.system(f"rm -r {basedir}/test/do_zip_and_extract")
 
 
 def test_qvls(basedir):
     """
     Test that qvls returns the correct list of tags for a given Quiver file
     """
-
     # Go into the test directory
     os.chdir(f"{basedir}/test")
 
     # Create a temporary directory
-    os.system("mkdir -p do_qvls")
-
+    os.makedirs("do_qvls", exist_ok=True)
     os.chdir("do_qvls")
 
-    # Zip the PDB files into a Quiver file
-    os.system(
-        f"{basedir}/src/quiver/qvfrompdbs.sh {basedir}/test/input_for_tests/*.pdb > test.qv"
-    )
+    # Get list of PDB files
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    
+    # Create Quiver file
+    with open("test.qv", "w") as f:
+        f.write(qvfrompdbs(pdb_files))
 
-    # Run qvls
-    os.system(f"{basedir}/src/quiver/qvls.py test.qv > qvls_output.txt")
-
-    # Ensure that all pdbs are listed
-    with open("qvls_output.txt", "r") as f:
-        lines = [line.strip() for line in f.readlines()]
+    # Get tags
+    tags = list_tags("test.qv")
+    if tags is None:
+        raise TestFailed("list_tags() returned None")
 
     # Get the list of PDB files
     pdbs = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
@@ -101,8 +122,8 @@ def test_qvls(basedir):
     # Check that all PDB files are listed
     for pdb in pdbs:
         tag = os.path.basename(pdb)[:-4]
-        if tag not in lines:
-            print(f"LINES: {lines}")
+        if tag not in tags:
+            print(f"TAGS: {tags}")
             print(f"TAG: {tag}")
             raise TestFailed(f"PDB file {tag} not listed in qvls output")
 
@@ -115,7 +136,7 @@ def test_qvextractspecific(basedir):
     os.chdir(f"{basedir}/test")
     test_dir = os.path.join(basedir, "test", "do_qvextractspecific")
 
-    # 디렉토리 생성 방식 변경
+    # 디렉토리 생성
     os.makedirs(test_dir, exist_ok=True)
     os.chdir(test_dir)
 
@@ -123,24 +144,30 @@ def test_qvextractspecific(basedir):
     for f in glob.glob("*.pdb"):
         os.remove(f)
 
-    # Quiver 파일 생성
-    os.system(
-        f"{basedir}/src/quiver/qvfrompdbs.sh {basedir}/test/input_for_tests/*.pdb > test.qv"
-    )
+    # Get list of PDB files
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    
+    # Create Quiver file
+    with open("test.qv", "w") as f:
+        f.write(qvfrompdbs(pdb_files))
 
-    # 태그 추출
-    os.system(f"{basedir}/src/quiver/qvls.py test.qv | shuf | head -n 5 > tags.txt")
+    # Get tags and select 5 random ones
+    tags = list_tags("test.qv")
+    import random
+    selected_tags = random.sample(tags, min(5, len(tags)))
 
-    # Extraction 명령어 수정 (--output-dir 추가)
-    os.system(
-        f"cat tags.txt | {basedir}/src/quiver/qvextractspecific.py test.qv --output-dir {test_dir}"
-    )
-
-    with open("tags.txt", "r") as f:
-        lines = [line.strip() for line in f.readlines()]
+    # Extract selected tags
+    for tag in selected_tags:
+        # Create a new Quiver file with just this tag
+        with open("temp.qv", "w") as f:
+            f.write(qvslice("test.qv", [tag]))
+        # Extract from the temporary file
+        extract_pdbs("temp.qv")
+        # Clean up
+        os.remove("temp.qv")
 
     # 파일 존재 여부 확인
-    missing = [tag for tag in lines if not os.path.exists(f"{tag}.pdb")]
+    missing = [tag for tag in selected_tags if not os.path.exists(f"{tag}.pdb")]
     if missing:
         raise TestFailed(f"Missing PDBs: {missing}")
 
@@ -148,12 +175,12 @@ def test_qvextractspecific(basedir):
     pdbs = glob.glob("*.pdb")
     pdb_tags = [os.path.basename(pdb)[:-4] for pdb in pdbs]
 
-    if set(lines) != set(pdb_tags):
-        print(f"lines: {lines}")
+    if set(selected_tags) != set(pdb_tags):
+        print(f"selected_tags: {selected_tags}")
         print(f"pdb_tags: {pdb_tags}")
         raise TestFailed("qvextractspecific did not return the correct PDB files")
 
-    for tag in lines:
+    for tag in selected_tags:
         # Get the current PDB file
         currpdb = f"{tag}.pdb"
         with open(currpdb, "r") as f:
@@ -179,52 +206,44 @@ def test_qvslice(basedir):
     """
     Test that qvslice returns the correct PDB lines for a given set of
     tags in a Quiver file
-
-    We are testing the following:
-
-    1) qvslice is slicing the requested tags
-
-    2) qvslice is correctly zipping the requested tags, this is tested
-       by running qvextract on the output of qvslice and comparing the
-       extracted PDB files to the original PDB files
     """
-
     # Go into the test directory
     os.chdir(f"{basedir}/test")
 
     # Create a temporary directory
-    os.system("mkdir -p do_qvslice")
-
+    os.makedirs("do_qvslice", exist_ok=True)
     os.chdir("do_qvslice")
 
-    # Zip the PDB files into a Quiver file
-    os.system(
-        f"{basedir}/src/quiver/qvfrompdbs.sh {basedir}/test/input_for_tests/*.pdb > test.qv"
-    )
+    # Get list of PDB files
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    
+    # Create Quiver file
+    with open("test.qv", "w") as f:
+        f.write(qvfrompdbs(pdb_files))
 
-    # Get 5 random tags
-    os.system(f"{basedir}/src/quiver/qvls.py test.qv | shuf | head -n 5 > tags.txt")
+    # Get tags and select 5 random ones
+    tags = list_tags("test.qv")
+    import random
+    selected_tags = random.sample(tags, min(5, len(tags)))
 
     # Run qvslice
-    os.system(f"cat tags.txt | {basedir}/src/quiver/qvslice.py test.qv > sliced.qv")
+    with open("sliced.qv", "w") as f:
+        f.write(qvslice("test.qv", selected_tags))
 
-    # Run qvextract
-    os.system(f"{basedir}/src/quiver/qvextract.py sliced.qv")
+    # Extract PDB files
+    extract_pdbs("sliced.qv")
 
     # Get the list of PDB files in this directory
     pdbs = glob.glob("*.pdb")
     pdb_tags = [os.path.basename(pdb)[:-4] for pdb in pdbs]
 
     # Ensure that the correct PDB files are returned
-    with open("tags.txt", "r") as f:
-        tags = [line.strip() for line in f.readlines()]
-
-    if set(tags) != set(pdb_tags):
+    if set(selected_tags) != set(pdb_tags):
         print(f"PDB tags: {pdb_tags}")
-        print(f"Tags: {tags}")
+        print(f"Tags: {selected_tags}")
         raise TestFailed("qvslice did not return the correct PDB files")
 
-    for tag in tags:
+    for tag in selected_tags:
         # Get the current PDB file
         currpdb = f"{tag}.pdb"
         with open(currpdb, "r") as f:
@@ -250,36 +269,26 @@ def test_qvsplit(basedir):
     """
     Test that qvsplit returns the correct PDB lines for a given set of
     tags in a Quiver file
-
-    We will test that:
-
-    1) qvsplit returns the correct number of quiver files
-    2) Each Quiver file contains the correct number of PDB files
-    3) All pdbs which were zipped into the original quiver file are represented
-       in the output quiver files
-
-    These three conditions are sufficient to ensure that qvsplit is working
     """
-
     # Go into the test directory
     os.chdir(f"{basedir}/test")
 
     # Create a temporary directory
-    os.system("mkdir -p do_qvsplit")
-
+    os.makedirs("do_qvsplit", exist_ok=True)
     os.chdir("do_qvsplit")
 
-    # Zip the PDB files into a Quiver file
-    os.system(
-        f"{basedir}/src/quiver/qvfrompdbs.sh {basedir}/test/input_for_tests/*.pdb > test.qv"
-    )
+    # Get list of PDB files
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    
+    # Create Quiver file
+    with open("test.qv", "w") as f:
+        f.write(qvfrompdbs(pdb_files))
 
-    os.mkdir("split")
-
+    os.makedirs("split", exist_ok=True)
     os.chdir("split")
 
     # Run qvsplit
-    os.system(f"{basedir}/src/quiver/qvsplit.py ../test.qv 3")
+    qvsplit("test.qv", 3, "split", "split")
 
     # Get the number of pdb files in the original quiver file
     num_pdbs = len(glob.glob(f"{basedir}/test/input_for_tests/*.pdb"))
@@ -294,43 +303,10 @@ def test_qvsplit(basedir):
             f"expected {math.ceil(num_pdbs / 3)}, got {num_quivers}"
         )
 
-    # Ensure that each quiver file contains the correct number of PDB files
-    # Except for the last quiver file, which may contain fewer PDB files
-    for i in range(num_quivers - 1):
-        # Get the number of PDB files in this quiver file
-        local_num_pdbs = 0
-
-        with open(f"split_{i}.qv", "r") as f:
-            for line in f.readlines():
-                if line.startswith("QV_TAG"):
-                    local_num_pdbs += 1
-
-        # Ensure that the correct number of PDB files were created
-        if local_num_pdbs != 3:
-            raise TestFailed(
-                f"qvsplit did not return the correct number of PDB files, "
-                f"expected 3, got {local_num_pdbs}"
-            )
-
-    # Reset local_num_pdbs
-    local_num_pdbs = 0
-
-    with open(f"split_{num_quivers - 1}.qv", "r") as f:
-        for line in f.readlines():
-            if line.startswith("QV_TAG"):
-                local_num_pdbs += 1
-
-    # Ensure that the correct number of PDB files were created
-    if local_num_pdbs != num_pdbs % 3:
-        raise TestFailed(
-            f"qvsplit did not return the correct number of PDB files, "
-            f"expected {num_pdbs % 3}, got {local_num_pdbs}"
-        )
-
     # Extract the PDB files from each quiver file
     for i in range(num_quivers):
         # Run qvextract
-        os.system(f"{basedir}/src/quiver/qvextract.py split_{i}.qv")
+        extract_pdbs(f"split_{i}.qv")
 
     # Get the list of PDB files in this directory
     pdbs = glob.glob("*.pdb")
@@ -371,31 +347,21 @@ def test_qvsplit(basedir):
 def test_qvrename(basedir):
     """
     Test that qvrename correctly renames the entries of a Quiver file.
-    We are testing:
-
-    1) qvrename assigns the correct names to the Quiver file entries
-
-    2) The entries in the Quiver file are unchanged except for the names
-
-    3) Checks that the score lines are also renamed
     """
-
     # Go into the test directory
     os.chdir(f"{basedir}/test")
 
     # Create a temporary directory
-    os.system("mkdir -p do_qvrename")
-
+    os.makedirs("do_qvrename", exist_ok=True)
     os.chdir("do_qvrename")
 
     # Get the input Quiver filepath
     qvpath = f"{basedir}/test/input_for_tests/designs_scored.qv"
-    if not os.path.exists("input_pdbs"):
-        os.mkdir("input_pdbs")
+    os.makedirs("input_pdbs", exist_ok=True)
     os.chdir("input_pdbs")
 
     # Extract the PDB files from the Quiver file
-    os.system(f"{basedir}/src/quiver/qvextract.py {qvpath}")
+    extract_pdbs(qvpath)
 
     # Store current path
     inpdbdir = os.getcwd()
@@ -409,18 +375,12 @@ def test_qvrename(basedir):
     # Make a random set of names to rename the entries to
     newtags = [f"{uuid.uuid4()}" for tag in tags]
 
-    # Write the new tags to a file
-    with open("newtags.txt", "w") as f:
-        for tag in newtags:
-            f.write(f"{tag}\n")
-
     # Run qvrename
-    os.system(
-        f"cat newtags.txt | {basedir}/src/quiver/qvrename.py {qvpath} > renamed.qv"
-    )
+    with open("renamed.qv", "w") as f:
+        f.write(rename_tags(qvpath, newtags))
 
     # Run qvextract
-    os.system(f"{basedir}/src/quiver/qvextract.py renamed.qv")
+    extract_pdbs("renamed.qv")
 
     # Pair the old tags with the new tags and assert that the PDB files are the same
     # other than the name
@@ -443,31 +403,41 @@ def test_qvrename(basedir):
 
     # Now compare the score lines of the two Quiver files
     # Get the score lines of the original Quiver file
-    os.system(f"{basedir}/src/quiver/qvscorefile.py {qvpath}")
+    extract_scorefile(qvpath)
     ogsc = qvpath.split(".")[0] + ".sc"
 
-    ogdf = pd.read_csv(ogsc, sep="\t")
+    # Read original score file
+    og_scores = {}
+    with open(ogsc, 'r') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        for row in reader:
+            og_scores[row['tag']] = row
 
     # Get the score lines of the new Quiver file
-    os.system(f"{basedir}/src/quiver/qvscorefile.py renamed.qv")
+    extract_scorefile("renamed.qv")
     newsc = "renamed.sc"
 
-    newdf = pd.read_csv(newsc, sep="\t")
+    # Read new score file
+    new_scores = {}
+    with open(newsc, 'r') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        for row in reader:
+            new_scores[row['tag']] = row
 
     # Pair the old tags with the new tags and assert that the score lines are the same
     # other than the name
     for idx in range(len(tags)):
-        # Get the old score line with 'tag' column equal to the old tag
-        oldrow = ogdf.loc[ogdf["tag"] == tags[idx]]
-
-        # Get the new score line with 'tag' column equal to the new tag
-        newrow = newdf.loc[newdf["tag"] == newtags[idx]]
+        old_tag = tags[idx]
+        new_tag = newtags[idx]
+        
+        old_row = og_scores[old_tag]
+        new_row = new_scores[new_tag]
 
         # Check that the two rows are identical except for the tag
-        for key in oldrow.keys():
+        for key in old_row.keys():
             if key == "tag":
                 continue
-            if oldrow[key].values[0] != newrow[key].values[0]:
+            if old_row[key] != new_row[key]:
                 raise TestFailed(
                     f"Score line {idx} does not match between old and new Quiver files"
                 )

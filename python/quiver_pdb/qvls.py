@@ -7,19 +7,21 @@ Usage:
 """
 
 import click
-from quiver import Quiver
-
+from quiver_pdb import list_tags
 
 @click.command()
 @click.argument("quiver_file", type=click.Path(exists=True, dir_okay=False))
-def list_tags(quiver_file):
+def main(quiver_file):
     """
     List all tags in the given Quiver file.
     """
-    qv = Quiver(quiver_file, "r")
-    for tag in qv.get_tags():
-        click.echo(tag)
-
+    try:
+        tags = list_tags(quiver_file)
+        for tag in tags:
+            click.echo(tag)
+    except Exception as e:
+        click.echo(f"Error listing tags: {e}", err=True)
+        raise click.Abort()
 
 if __name__ == "__main__":
-    list_tags()
+    main()
