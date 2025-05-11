@@ -9,7 +9,7 @@ Usage:
 """
 
 import click
-from quiver_pdb import qvsplit as rust_qvsplit  # Rust로 구현된 quiver_pdb 모듈 import
+from quiver_pdb import rs_qvsplit
 
 
 @click.command()
@@ -36,7 +36,7 @@ def qvsplit(file, ntags, prefix, output_dir):
     click.secho(f"🔪 Splitting into chunks of {ntags} tags...", fg="green")
 
     try:
-        rust_qvsplit(file, ntags, prefix, output_dir)
+        rs_qvsplit(file, ntags, prefix, output_dir)
     except Exception as e:
         click.secho(f"Error splitting Quiver file: {e}", fg="red", err=True)
         raise click.Abort()

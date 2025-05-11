@@ -7,7 +7,8 @@ Usage:
 """
 
 import click
-from quiver_pdb import extract_pdbs as rust_extract_pdbs
+from quiver_pdb import rs_extract_pdbs
+
 
 @click.command()
 @click.argument("quiver_file", type=click.Path(exists=True, dir_okay=False))
@@ -15,7 +16,8 @@ def extract_pdbs(quiver_file):
     """
     Extract all PDB files from a Quiver file.
     """
-    rust_extract_pdbs(quiver_file)
+    rs_extract_pdbs(quiver_file)
+
 
 if __name__ == "__main__":
     extract_pdbs()

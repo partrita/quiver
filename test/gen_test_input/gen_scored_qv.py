@@ -9,7 +9,7 @@ This scores quiver file will be used in testing later.
 import sys
 
 sys.path.append("../../")
-from quiver import Quiver
+from quiver_pdb import Quiver
 import os
 import glob
 import random

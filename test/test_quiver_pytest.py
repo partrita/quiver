@@ -1,153 +1,247 @@
+#!/usr/bin/env python3
+"""Tests for the Quiver library."""
+
+import sys
 import os
-import pytest
-import time
-from pathlib import Path
+import math
+import uuid
+import csv
+import glob
+import shutil
 from quiver_pdb import (
-    extract_pdbs,
-    qvfrompdbs,
-    extract_scorefile,
-    list_tags,
-    rename_tags,
-    qvslice,
-    qvsplit,
+    Quiver,
+    rs_qvfrompdbs,
+    rs_extract_pdbs,
+    rs_list_tags,
+    rs_rename_tags,
+    rs_qvslice,
+    rs_qvsplit,
+    rs_extract_scorefile,
 )
 
-# 테스트 데이터 디렉토리 설정
-TEST_DATA_DIR = Path(__file__).parent / "test_data"
-TEST_QV_FILE = TEST_DATA_DIR / "test.qv"
-TEST_PDB_FILES = [TEST_DATA_DIR / f"test_{i}.pdb" for i in range(3)]
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_data():
-    """테스트 데이터 디렉토리 생성 및 테스트 파일 생성"""
-    TEST_DATA_DIR.mkdir(exist_ok=True)
 
-    # 테스트용 PDB 파일 생성
-    for pdb_file in TEST_PDB_FILES:
-        with open(pdb_file, "w") as f:
-            f.write("ATOM      1  N   ALA A   1      27.526  24.362   4.697  1.00 20.00\n")
+class TestFailed(Exception):
+    pass
 
-    # 테스트용 Quiver 파일 생성
-    qv_content = qvfrompdbs([str(pdb) for pdb in TEST_PDB_FILES])
 
-    # 점수 정보 추가
-    lines = qv_content.split('\n')
-    modified_lines = []
-    for line in lines:
-        if line.startswith('QV_TAG'):
-            tag = line.split()[1]
-            modified_lines.append(line)
-            # 각 태그에 대한 점수 정보 추가
-            modified_lines.append(f"QV_SCORE {tag} rms=1.5|score=0.8")
-        else:
-            modified_lines.append(line)
+def normalize_pdb_content(content):
+    return "\n".join(line.strip() for line in content.splitlines() if line.strip())
 
-    qv_content = '\n'.join(modified_lines)
 
-    with open(TEST_QV_FILE, "w") as f:
-        f.write(qv_content)
+def compare_pdb_files(file1, file2):
+    with open(file1, "r") as f1, open(file2, "r") as f2:
+        return normalize_pdb_content(f1.read()) == normalize_pdb_content(f2.read())
 
-    yield
 
-    # 테스트 후 정리
-    for file in TEST_DATA_DIR.glob("*"):
-        file.unlink()
-    TEST_DATA_DIR.rmdir()
-    # 커맨드 폴더의 *.pdb 파일도 삭제
-    for pdb_file in Path(".").glob("*.pdb"):
-        pdb_file.unlink()
+def run_test(test_func, basedir, test_name):
+    print(f"Running {test_name} test")
+    try:
+        test_func(basedir)
+        print(f"Passed {test_name} test")
+        return True
+    except TestFailed as e:
+        print(f"Test {test_name} failed with error: {e}")
+        return False
+    finally:
+        cleanup_test_directory(basedir, test_name)
 
-def test_qvfrompdbs():
-    """qvfrompdbs 도구 테스트"""
-    start_time = time.time()
-    result = qvfrompdbs([str(pdb) for pdb in TEST_PDB_FILES])
-    end_time = time.time()
 
-    assert result is not None
-    assert len(result) > 0
-    assert end_time - start_time < 1.0  # 1초 이내 실행
+def cleanup_test_directory(basedir, test_name):
+    test_dir = os.path.join(basedir, "test", f"do_{test_name}")
+    if os.path.exists(test_dir):
+        shutil.rmtree(test_dir, ignore_errors=True)
+    for file in glob.glob(os.path.join(basedir, "test", f"do_{test_name}", "*.qv")):
+        os.remove(file)
 
-def test_extract_pdbs():
-    """extract_pdbs 도구 테스트"""
-    start_time = time.time()
-    # extract_pdbs(str(TEST_QV_FILE), outdir=str(TEST_DATA_DIR))  # outdir 지원 시
-    extract_pdbs(str(TEST_QV_FILE))  # outdir 미지원 시
-    end_time = time.time()
 
-    extracted_files = list(TEST_DATA_DIR.glob("*.pdb"))
-    assert len(extracted_files) > 0
-    assert end_time - start_time < 2.0  # 2초 이내 실행
+def test_zip_and_extract(basedir):
+    test_dir = os.path.join(basedir, "test", "do_zip_and_extract")
+    os.makedirs(test_dir, exist_ok=True)
+    os.chdir(test_dir)
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    with open("test.qv", "w") as f:
+        f.write(rs_qvfrompdbs(pdb_files))
+    rs_extract_pdbs("test.qv")
+    for pdb in glob.glob("*.pdb"):
+        tag = os.path.basename(pdb)[:-4]
+        print(f"✅ Extracted {tag}")
+        original_pdb = f"{basedir}/test/input_for_tests/{tag}.pdb"
+        if not compare_pdb_files(pdb, original_pdb):
+            raise TestFailed(f"File {pdb} does not match {original_pdb}")
+    os.chdir(basedir)
 
-def test_extract_scorefile():
-    """extract_scorefile 도구 테스트"""
-    start_time = time.time()
-    extract_scorefile(str(TEST_QV_FILE))
-    end_time = time.time()
 
-    score_file = TEST_DATA_DIR / "test.sc"
-    assert score_file.exists()
-    assert end_time - start_time < 1.0  # 1초 이내 실행
+def test_qvls(basedir):
+    test_dir = os.path.join(basedir, "test", "do_qvls")
+    os.makedirs(test_dir, exist_ok=True)
+    os.chdir(test_dir)
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    with open("test.qv", "w") as f:
+        f.write(rs_qvfrompdbs(pdb_files))
+    tags = rs_list_tags("test.qv")
+    if not tags:
+        raise TestFailed("list_tags() returned None")
+    expected_tags = [
+        os.path.basename(pdb)[:-4]
+        for pdb in glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    ]
+    if set(tags) != set(expected_tags):
+        raise TestFailed(f"Expected tags: {expected_tags}, got: {tags}")
+    os.chdir(basedir)
 
-def test_list_tags():
-    """list_tags 도구 테스트"""
-    start_time = time.time()
-    list_tags(str(TEST_QV_FILE))  # 함수는 None을 반환하므로 반환값 검사 제거
-    end_time = time.time()
 
-    assert end_time - start_time < 1.0  # 1초 이내 실행
+def test_qvextractspecific(basedir):
+    test_dir = os.path.join(basedir, "test", "do_qvextractspecific")
+    os.makedirs(test_dir, exist_ok=True)
+    os.chdir(test_dir)
+    for f in glob.glob("*.pdb"):
+        os.remove(f)
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    with open("test.qv", "w") as f:
+        f.write(rs_qvfrompdbs(pdb_files))
+    tags = rs_list_tags("test.qv")
+    selected_tags = random.sample(tags, min(5, len(tags)))
+    for tag in selected_tags:
+        with open("temp.qv", "w") as f:
+            sliced_qv = rs_qvslice("test.qv", [tag])
+            if not sliced_qv:
+                raise TestFailed("rs_qvslice returned None")
+            f.write(sliced_qv)
+        rs_extract_pdbs("temp.qv")
+        os.remove("temp.qv")
+        if not os.path.exists(f"{tag}.pdb"):
+            raise TestFailed(f"Missing PDB: {tag}.pdb")
+        original_pdb = f"{basedir}/test/input_for_tests/{tag}.pdb"
+        if not compare_pdb_files(f"{tag}.pdb", original_pdb):
+            raise TestFailed(f"PDB file {tag}.pdb does not match original")
+    extracted_pdbs = [os.path.basename(pdb)[:-4] for pdb in glob.glob("*.pdb")]
+    if set(selected_tags) != set(extracted_pdbs):
+        raise TestFailed("Extracted PDBs do not match selected tags")
+    os.chdir(basedir)
 
-def test_rename_tags():
-    """rename_tags 도구 테스트"""
-    start_time = time.time()
-    new_tags = ["new_tag1", "new_tag2", "new_tag3"]  # 태그 수를 3개로 수정
-    rename_tags(str(TEST_QV_FILE), new_tags)
-    end_time = time.time()
 
-    # 이름 변경 후 태그 확인
-    list_tags(str(TEST_QV_FILE))  # 함수는 None을 반환하므로 반환값 검사 제거
-    assert end_time - start_time < 1.0  # 1초 이내 실행
+def test_qvslice(basedir):
+    test_dir = os.path.join(basedir, "test", "do_qvslice")
+    os.makedirs(test_dir, exist_ok=True)
+    os.chdir(test_dir)
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    with open("test.qv", "w") as f:
+        f.write(rs_qvfrompdbs(pdb_files))
+    tags = rs_list_tags("test.qv")
+    selected_tags = random.sample(tags, min(5, len(tags)))
+    sliced_content = rs_qvslice("test.qv", selected_tags)
+    if not sliced_content:
+        raise TestFailed("rs_qvslice returned None")
+    with open("sliced.qv", "w") as f:
+        f.write(sliced_content)
+    rs_extract_pdbs("sliced.qv")
+    extracted_pdbs = [os.path.basename(pdb)[:-4] for pdb in glob.glob("*.pdb")]
+    if set(selected_tags) != set(extracted_pdbs):
+        raise TestFailed("Extracted PDBs from slice do not match selected tags")
+    for tag in selected_tags:
+        original_pdb = f"{basedir}/test/input_for_tests/{tag}.pdb"
+        if not compare_pdb_files(f"{tag}.pdb", original_pdb):
+            raise TestFailed(f"PDB file {tag}.pdb from slice does not match original")
+    os.chdir(basedir)
 
-def test_qvslice():
-    """qvslice 도구 테스트"""
-    start_time = time.time()
-    tags = ["test_0", "test_1"]  # 실제 존재하는 태그로 수정
-    qvslice(str(TEST_QV_FILE), tags)  # 함수는 None을 반환하므로 반환값 검사 제거
-    end_time = time.time()
 
-    assert end_time - start_time < 1.0  # 1초 이내 실행
+def test_qvsplit(basedir):
+    test_dir = os.path.join(basedir, "test", "do_qvsplit")
+    os.makedirs(test_dir, exist_ok=True)
+    os.chdir(test_dir)
+    pdb_files = glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    with open("test.qv", "w") as f:
+        f.write(rs_qvfrompdbs(pdb_files))
+    os.makedirs("split", exist_ok=True)
+    os.chdir("split")
+    rs_qvsplit("../test.qv", 3, "split", ".")
+    num_pdbs = len(glob.glob(f"{basedir}/test/input_for_tests/*.pdb"))
+    num_quivers = len(glob.glob("*.qv"))
+    if num_quivers != math.ceil(num_pdbs / 3):
+        raise TestFailed(
+            f"Expected {math.ceil(num_pdbs / 3)} quiver files, got {num_quivers}"
+        )
+    all_extracted_tags = set()
+    for qv_file in glob.glob("*.qv"):
+        rs_extract_pdbs(qv_file)
+        all_extracted_tags.update(
+            os.path.basename(pdb)[:-4] for pdb in glob.glob("*.pdb")
+        )
+    expected_tags = {
+        os.path.basename(pdb)[:-4]
+        for pdb in glob.glob(f"{basedir}/test/input_for_tests/*.pdb")
+    }
+    if all_extracted_tags != expected_tags:
+        raise TestFailed("Extracted PDBs after split do not match original set")
+    for tag in expected_tags:
+        original_pdb = f"{basedir}/test/input_for_tests/{tag}.pdb"
+        if not compare_pdb_files(f"{tag}.pdb", original_pdb):
+            raise TestFailed(f"PDB file {tag}.pdb after split does not match original")
+    os.chdir(basedir)
 
-def test_qvsplit():
-    """qvsplit 도구 테스트"""
-    start_time = time.time()
-    ntags = 2
-    prefix = "split_test"
-    output_dir = str(TEST_DATA_DIR)
-    qvsplit(str(TEST_QV_FILE), ntags, prefix, output_dir)
-    end_time = time.time()
 
-    split_files = list(TEST_DATA_DIR.glob(f"{prefix}_*.qv"))
-    assert len(split_files) > 0
-    assert end_time - start_time < 2.0  # 2초 이내 실행
+def test_qvrename(basedir):
+    test_dir = os.path.join(basedir, "test", "do_qvrename")
+    os.makedirs(test_dir, exist_ok=True)
+    os.chdir(test_dir)
+    qvpath = f"{basedir}/test/input_for_tests/designs_scored.qv"
+    os.makedirs("input_pdbs", exist_ok=True)
+    os.chdir("input_pdbs")
+    rs_extract_pdbs(qvpath)
+    input_pdb_dir = os.getcwd()
+    os.chdir(test_dir)
+    inqv = Quiver(qvpath, "r")
+    tags = inqv.get_tags()
+    new_tags = [f"{uuid.uuid4()}" for _ in tags]
+    renamed_qv_content = rs_rename_tags(qvpath, new_tags)
+    if not renamed_qv_content:
+        raise TestFailed("rs_rename_tags returned None")
+    with open("renamed.qv", "w") as f:
+        f.write(renamed_qv_content)
+    rs_extract_pdbs("renamed.qv")
+    original_scores = {}
+    rs_extract_scorefile(qvpath)
+    with open(qvpath.replace(".qv", ".sc"), "r") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            original_scores[row["tag"]] = row
+    rs_extract_scorefile("renamed.qv")
+    with open("renamed.csv", "r") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            new_scores = {row["tag"]: row}
+            original_tag = tags[new_tags.index(row["tag"])]
+            if not compare_pdb_files(
+                os.path.join(input_pdb_dir, f"{original_tag}.pdb"), f"{row['tag']}.pdb"
+            ):
+                raise TestFailed(
+                    f"Renamed PDB {row['tag']}.pdb does not match original {original_tag}.pdb"
+                )
+            if original_tag not in original_scores:
+                raise TestFailed(f"Original tag {original_tag} not found in scores")
+            for key, value in original_scores[original_tag].items():
+                if key == "tag":
+                    continue
+                if new_scores[row["tag"]].get(key) != value:
+                    raise TestFailed(f"Score mismatch for {row['tag']}")
+    os.chdir(basedir)
 
-def test_performance_large_file():
-    """대용량 파일 처리 성능 테스트"""
-    # 대용량 테스트 파일 생성
-    large_qv_file = TEST_DATA_DIR / "large_test.qv"
-    large_pdb_files = [TEST_DATA_DIR / f"large_test_{i}.pdb" for i in range(10)]
 
-    # 대용량 PDB 파일 생성
-    for pdb_file in large_pdb_files:
-        with open(pdb_file, "w") as f:
-            for i in range(1000):  # 각 파일에 1000개의 원자 추가
-                f.write(f"ATOM  {i:5d}  N   ALA A {i:4d}   27.526  24.362   4.697  1.00 20.00\n")
-
-    # 대용량 Quiver 파일 생성
-    qv_content = qvfrompdbs([str(pdb) for pdb in large_pdb_files])
-    with open(large_qv_file, "w") as f:
-        f.write(qv_content)
-
-    start_time = time.time()
-    list_tags(str(large_qv_file))  # 함수는 None을 반환하므로 반환값 검사 제거
-    end_time = time.time()
-
-    assert end_time - start_time < 5.0  # 5초 이내 실행
+if __name__ == "__main__":
+    basedir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    passed_tests = [
+        run_test(test_zip_and_extract, basedir, "zip_and_extract"),
+        run_test(test_qvls, basedir, "qvls"),
+        run_test(test_qvextractspecific, basedir, "qvextractspecific"),
+        run_test(test_qvslice, basedir, "qvslice"),
+        run_test(test_qvsplit, basedir, "qvsplit"),
+        run_test(test_qvrename, basedir, "qvrename"),
+    ]
+    passed_count = sum(passed_tests)
+    total_count = len(passed_tests)
+    print("\n" + "#" * 50)
+    print(f"Passed {passed_count}/{total_count} tests")
+    print("#" * 50)

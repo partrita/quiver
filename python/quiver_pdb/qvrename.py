@@ -10,7 +10,8 @@ import sys
 import os
 import stat
 import click
-from quiver_pdb import rename_tags as rust_rename_tags
+from quiver_pdb import rs_rename_tags
+
 
 @click.command()
 @click.argument("quiver_file", type=click.Path(exists=True, dir_okay=False))
@@ -31,7 +32,7 @@ def rename_tags(quiver_file, new_tags):
     tags = [tag.strip() for tag in tag_buffers if tag.strip()]
 
     try:
-        rust_rename_tags(quiver_file, tags)
+        rs_rename_tags(quiver_file, tags)
     except Exception as e:
         click.secho(f"Error renaming tags: {e}", fg="red", err=True)
         sys.exit(1)

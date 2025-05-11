@@ -1,10 +1,11 @@
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
-use std::fs::{File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write, Read};
 use std::path::Path;
-use std::collections::HashSet;
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
+use std::process;
+use std::env;
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -227,7 +228,7 @@ impl Quiver {
 
 /// 여러 PDB 파일을 받아 Quiver 포맷으로 반환
 #[pyfunction]
-fn qvfrompdbs(pdb_files: Vec<String>) -> PyResult<String> {
+fn rs_qvfrompdbs(pdb_files: Vec<String>) -> PyResult<String> {
     let mut output = Vec::new();
 
     for pdbfn in &pdb_files {
@@ -249,7 +250,7 @@ fn qvfrompdbs(pdb_files: Vec<String>) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn extract_pdbs(py: Python, quiver_file: String) -> PyResult<()> {
+fn rs_extract_pdbs(py: Python, quiver_file: String) -> PyResult<()> {
     match Quiver::new(quiver_file.clone(), "r".to_string()) {
         Ok(qv) => {
             let tags = qv.get_tags();
@@ -259,7 +260,7 @@ fn extract_pdbs(py: Python, quiver_file: String) -> PyResult<()> {
             // 순차적 처리로 변경
             for tag in &tags {
                 let outfn = format!("{}.pdb", tag);
-                
+
                 // 파일이 이미 존재하는 경우 건너뛰기
                 if Path::new(&outfn).exists() {
                     let _ = print_fn.call1((format!("⚠️  File {} already exists, skipping", outfn),));
@@ -295,9 +296,9 @@ fn extract_pdbs(py: Python, quiver_file: String) -> PyResult<()> {
     }
 }
 
-// list_tags 함수 추가
+// rs_list_tags 함수 추가
 #[pyfunction]
-fn list_tags(quiver_file: String) -> PyResult<Vec<String>> {
+fn rs_list_tags(quiver_file: String) -> PyResult<Vec<String>> {
     match Quiver::new(quiver_file.clone(), "r".to_string()) {
         Ok(qv) => {
             let tags = qv.get_tags();
@@ -307,9 +308,9 @@ fn list_tags(quiver_file: String) -> PyResult<Vec<String>> {
     }
 }
 
-// rename_tags 함수 추가
+// rs_rename_tags 함수 추가
 #[pyfunction]
-fn rename_tags(py: Python, quiver_file: String, new_tags: Vec<String>) -> PyResult<()> {
+fn rs_rename_tags(py: Python, quiver_file: String, new_tags: Vec<String>) -> PyResult<()> {
     match Quiver::new(quiver_file.clone(), "r".to_string()) {
         Ok(qv) => {
             let present_tags = qv.get_tags();
@@ -374,9 +375,9 @@ fn rename_tags(py: Python, quiver_file: String, new_tags: Vec<String>) -> PyResu
     }
 }
 
-// qvslice 함수 추가
+// rs_qvslice 함수 추가
 #[pyfunction]
-fn qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyResult<()> {
+fn rs_qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyResult<()> {
     let mut tag_list = tags.unwrap_or_else(Vec::new);
 
     // Read tags from stdin if no arguments are provided
@@ -435,9 +436,9 @@ fn qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyResu
     }
 }
 
-// qvsplit 함수 추가
+// rs_qvsplit 함수 추가
 #[pyfunction]
-fn qvsplit(py: Python, file: String, ntags: usize, prefix: String, output_dir: String) -> PyResult<()> {
+fn rs_qvsplit(py: Python, file: String, ntags: usize, prefix: String, output_dir: String) -> PyResult<()> {
     if ntags == 0 {
         let builtins = py.import("builtins")?;
         builtins.getattr("print")?.call1(("❌ NTAGS must be a positive integer.",))?;
@@ -461,9 +462,9 @@ fn qvsplit(py: Python, file: String, ntags: usize, prefix: String, output_dir: S
     }
 }
 
-// extract_scorefile 함수 추가
+// rs_extract_scorefile 함수 추가
 #[pyfunction]
-fn extract_scorefile(py: Python, quiver_file: String) -> PyResult<()> {
+fn rs_extract_scorefile(py: Python, quiver_file: String) -> PyResult<()> {
     let mut records = Vec::new();
     let file = File::open(&quiver_file).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let reader = BufReader::new(file);
@@ -505,7 +506,7 @@ fn extract_scorefile(py: Python, quiver_file: String) -> PyResult<()> {
     }
 
     // CSV 파일로 저장
-    let path = Path::new(&quiver_file).with_extension("sc");
+    let path = Path::new(&quiver_file).with_extension("csv");
     let outfn = path.to_str()
         .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Invalid file path"))?;
 
@@ -544,16 +545,118 @@ fn extract_scorefile(py: Python, quiver_file: String) -> PyResult<()> {
     Ok(())
 }
 
+// rs_extract_selected_pdbs 함수 추가
+#[pyfunction]
+fn rs_extract_selected_pdbs(
+    py: Python,
+    quiver_file: String,
+    tags: PyObject,
+    output_dir: String,
+) -> PyResult<()> {
+    let mut tag_buffers: Vec<String> = tags.extract(py)?;
+
+    // Check if input is being piped via stdin (without relying on libc::S_ISFIFO)
+    if !env::var("TERM").is_ok() { // A common heuristic for detecting pipes
+        let stdin = io::stdin();
+        let stdin_tags: Vec<String> = stdin
+            .lock()
+            .lines()
+            .filter_map(Result::ok)
+            .flat_map(|line| line.split_whitespace().map(String::from).collect::<Vec<String>>())
+            .collect();
+        tag_buffers.extend(stdin_tags);
+    }
+
+    // Clean and deduplicate tags
+    let mut unique_tags: Vec<String> = tag_buffers
+        .into_iter()
+        .filter(|tag| !tag.is_empty())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    unique_tags.sort();
+
+    if unique_tags.is_empty() {
+        let click = py.import("click")?;
+        click.call_method1("secho", ("❗ No tags provided.",))?.call_method1("fg", ("red",))?;
+        process::exit(1);
+    }
+
+    // Ensure output directory exists
+    fs::create_dir_all(&output_dir).map_err(|e| {
+        pyo3::exceptions::PyIOError::new_err(format!("Failed to create output directory: {}", e))
+    })?;
+
+    match Quiver::new(quiver_file.clone(), "r".to_string()) {
+        Ok(qv) => {
+            let mut extracted_count = 0;
+            let click = py.import("click")?;
+            let os = py.import("os")?;
+
+            for tag in &unique_tags {
+                let outfn_result = os.call_method1("path", ())?.call_method1("join", (&output_dir, format!("{}.pdb", tag)));
+                if let Ok(outfn_obj) = outfn_result {
+                    if let Ok(outfn) = outfn_obj.extract::<String>() {
+                        let path = Path::new(&outfn);
+
+                        if path.exists() {
+                            click.call_method1("echo", (format!("⚠️  File {} already exists, skipping", outfn),))?;
+                            continue;
+                        }
+
+                        match qv.get_pdblines(tag.clone()) {
+                            Ok(lines) => {
+                                let mut outfile = File::create(&outfn).map_err(|e| {
+                                    pyo3::exceptions::PyIOError::new_err(format!("Failed to create file {}: {}", outfn, e))
+                                })?;
+                                for line in lines {
+                                    outfile.write_all(line.as_bytes()).map_err(|e| {
+                                        pyo3::exceptions::PyIOError::new_err(format!("Failed to write to file {}: {}", outfn, e))
+                                    })?;
+                                }
+                                click.call_method1("echo", (format!("✅ Extracted {}", outfn),))?;
+                                extracted_count += 1;
+                            }
+                            Err(_) => {
+                                click.call_method1("secho", (format!("❌ Could not find tag {} in Quiver file, skipping", tag),))?.call_method1("fg", ("yellow",))?;
+                            }
+                        }
+                    } else {
+                        return Err(pyo3::exceptions::PyTypeError::new_err("Failed to convert path to string"));
+                    }
+                } else {
+                    return Err(pyo3::exceptions::PyIOError::new_err("Failed to join path"));
+                }
+            }
+
+            click.call_method1(
+                "secho",
+                (format!(
+                    "\n🎉 Successfully extracted {} PDB file(s) from {} to {}",
+                    extracted_count, quiver_file, output_dir
+                ),),
+            )?
+            .call_method1("fg", ("green",))?;
+
+            Ok(())
+        }
+        Err(e) => Err(pyo3::exceptions::PyIOError::new_err(e)),
+    }
+}
+
+
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn quiver_pdb(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(qvfrompdbs, m)?)?;
-    m.add_function(wrap_pyfunction!(extract_pdbs, m)?)?;
-    m.add_function(wrap_pyfunction!(list_tags, m)?)?;
-    m.add_function(wrap_pyfunction!(rename_tags, m)?)?;
-    m.add_function(wrap_pyfunction!(qvslice, m)?)?;
-    m.add_function(wrap_pyfunction!(qvsplit, m)?)?;
-    m.add_function(wrap_pyfunction!(extract_scorefile, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_qvfrompdbs, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_extract_pdbs, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_list_tags, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_rename_tags, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_qvslice, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_qvsplit, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_extract_scorefile, m)?)?;
+    m.add_function(wrap_pyfunction!(rs_extract_selected_pdbs, m)?)?;
     m.add_class::<Quiver>()?;
     Ok(())
 }
