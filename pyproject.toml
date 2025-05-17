@@ -17,14 +17,14 @@ dependencies = [
 ]
 
 [project.scripts]
-qvfrompdbs = "quiver.qvfrompdbs:qvfrompdbs"
-qvls = "quiver.qvls:list_tags"
-qvextract = "quiver.qvextract:extract_pdbs"
-#qvextractspecific = "quiver.qvextractspecific:extract_selected_pdbs"
-qvscorefile = "quiver.qvscorefile:extract_scorefile"
-qvrename = "quiver.qvrename:rename_tags"
-qvsplit = "quiver.qvsplit:qvsplit"
-qvslice = "quiver.qvslice:qvslice"
+qvfrompdbs = "quiver_pdb.qvfrompdbs:qvfrompdbs"
+qvls = "quiver_pdb.qvls:list_tags"
+qvextract = "quiver_pdb.qvextract:extract_pdbs"
+#qvextractspecific = "quiver_pdb.qvextractspecific:extract_selected_pdbs"
+qvscorefile = "quiver_pdb.qvscorefile:extract_scorefile"
+qvrename = "quiver_pdb.qvrename:rename_tags"
+qvsplit = "quiver_pdb.qvsplit:qvsplit"
+qvslice = "quiver_pdb.qvslice:qvslice"
 
 [build-system]
 requires = ["maturin>=1.8,<2.0"]
