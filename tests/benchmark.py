@@ -124,7 +124,7 @@ def main():
     basedir = parent_dir  # Project root directory
     benchmark_dir = pathlib.Path("./benchmark_temp")
     benchmark_dir.mkdir(exist_ok=True)
-    input_pdb_dir = os.path.join(basedir, "test", "input_for_tests")
+    input_pdb_dir = os.path.join(basedir, "tests", "input_for_tests")
     input_pdb_files = glob.glob(os.path.join(input_pdb_dir, "*.pdb"))
     input_pdb_files = [os.path.abspath(f) for f in input_pdb_files]
 

@@ -38,7 +38,13 @@ def qvslice(quiver_file, tags):
         sys.exit(1)
 
     try:
-        rs_qvslice(quiver_file, tag_list)
+        result = rs_qvslice(quiver_file, tag_list)
+        # Print warnings to stderr
+        for line in result.splitlines():
+            if line.startswith("⚠️"):
+                click.secho(line, fg="yellow", err=True)
+            else:
+                print(line)
     except Exception as e:
         click.secho(f"Error slicing Quiver file: {e}", fg="red", err=True)
         sys.exit(1)

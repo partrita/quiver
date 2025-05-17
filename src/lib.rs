@@ -250,47 +250,50 @@ fn rs_qvfrompdbs(pdb_files: Vec<String>) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn rs_extract_pdbs(py: Python, quiver_file: String) -> PyResult<()> {
+fn rs_extract_pdbs(_py: Python, quiver_file: String) -> PyResult<bool> {
     match Quiver::new(quiver_file.clone(), "r".to_string()) {
         Ok(qv) => {
             let tags = qv.get_tags();
-            let size = qv.size();
-            let print_fn = py.import("builtins")?.getattr("print")?;
+            let mut extracted_count = 0;
 
-            // 순차적 처리로 변경
             for tag in &tags {
                 let outfn = format!("{}.pdb", tag);
 
-                // 파일이 이미 존재하는 경우 건너뛰기
+                // 파일이 이미 존재하는 경우 건너뛰기 
                 if Path::new(&outfn).exists() {
-                    let _ = print_fn.call1((format!("⚠️  File {} already exists, skipping", outfn),));
                     continue;
                 }
 
                 // PDB 라인 가져오기
-                if let Ok(lines) = qv.get_pdblines(tag.clone()) {
-                    // 파일 생성 및 쓰기
-                    if let Ok(mut f) = File::create(&outfn) {
-                        // 모든 라인을 한 번에 쓰기
-                        let content = lines.join("");
-                        if f.write_all(content.as_bytes()).is_ok() {
-                            let _ = print_fn.call1((format!("✅ Extracted {}", outfn),));
-                        } else {
-                            let _ = print_fn.call1((format!("❌ Error writing to file {}", outfn),));
+                match qv.get_pdblines(tag.clone()) {
+                    Ok(lines) => {
+                        // 파일 생성 및 쓰기
+                        match File::create(&outfn) {
+                            Ok(mut f) => {
+                                let content = lines.join("");
+                                if let Err(e) = f.write_all(content.as_bytes()) {
+                                    return Err(pyo3::exceptions::PyIOError::new_err(
+                                        format!("Failed to write to file {}: {}", outfn, e)
+                                    ));
+                                }
+                                extracted_count += 1;
+                            }
+                            Err(e) => {
+                                return Err(pyo3::exceptions::PyIOError::new_err(
+                                    format!("Failed to create file {}: {}", outfn, e)
+                                ));
+                            }
                         }
-                    } else {
-                        let _ = print_fn.call1((format!("❌ Error creating file {}", outfn),));
                     }
-                } else {
-                    let _ = print_fn.call1((format!("❌ Error extracting tag {}", tag),));
+                    Err(e) => {
+                        return Err(pyo3::exceptions::PyIOError::new_err(
+                            format!("Failed to get PDB lines for tag {}: {}", tag, e)
+                        ));
+                    }
                 }
             }
 
-            print_fn.call1((
-                format!("\n🎉 Successfully processed {} tags from {}", size, quiver_file),
-            ))?;
-
-            Ok(())
+            Ok(extracted_count > 0)
         }
         Err(e) => Err(e),
     }
@@ -310,74 +313,66 @@ fn rs_list_tags(quiver_file: String) -> PyResult<Vec<String>> {
 
 // rs_rename_tags 함수 추가
 #[pyfunction]
-fn rs_rename_tags(py: Python, quiver_file: String, new_tags: Vec<String>) -> PyResult<()> {
+fn rs_rename_tags(_py: Python, quiver_file: String, new_tags: Vec<String>) -> PyResult<String> {
     match Quiver::new(quiver_file.clone(), "r".to_string()) {
         Ok(qv) => {
             let present_tags = qv.get_tags();
 
             if present_tags.len() != new_tags.len() {
-                let builtins = py.import("builtins")?;
-                builtins.getattr("print")?.call1((
-                    format!("❌ Number of tags in file ({}) does not match number of tags provided ({})", present_tags.len(), new_tags.len()),
-                ))?;
-                return Ok(()); // Python 스크립트의 sys.exit(1)과 유사하게 종료
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    format!("Number of tags in file ({}) does not match number of tags provided ({})",
+                        present_tags.len(), new_tags.len())
+                ));
             }
 
             let mut tag_idx = 0;
-            let mut output_lines = Vec::new();
-            let file = File::open(&quiver_file).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+            let mut output = String::new();
+            let file = File::open(&quiver_file)
+                .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
             let reader = BufReader::new(file);
 
             let mut lines_iter = reader.lines();
             while let Some(result_line) = lines_iter.next() {
                 let line = result_line.map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
                 if line.starts_with("QV_TAG") {
-                    output_lines.push(format!("QV_TAG {}\n", new_tags[tag_idx]));
+                    output.push_str(&format!("QV_TAG {}\n", new_tags[tag_idx]));
 
                     if let Some(result_next_line) = lines_iter.next() {
                         let next_line = result_next_line.map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
                         if next_line.starts_with("QV_TAG") {
-                            let builtins = py.import("builtins")?;
-                            builtins.getattr("print")?.call1((
-                                format!("❌ Error: Found two QV_TAG lines in a row. This is not supported. Line: {}", next_line),
-                            ))?;
-                            return Ok(());
+                            return Err(pyo3::exceptions::PyValueError::new_err(
+                                format!("Error: Found two QV_TAG lines in a row. This is not supported. Line: {}", next_line)
+                            ));
                         }
                         if next_line.starts_with("QV_SCORE") {
                             let parts: Vec<_> = next_line.split_whitespace().collect();
                             if parts.len() > 2 {
-                                output_lines.push(format!("QV_SCORE {} {}\n", new_tags[tag_idx], parts[2]));
+                                output.push_str(&format!("QV_SCORE {} {}\n", new_tags[tag_idx], parts[2]));
                             } else {
-                                output_lines.push(next_line.to_string() + "\n");
+                                output.push_str(&next_line);
+                                output.push('\n');
                             }
                         } else {
-                            output_lines.push(next_line.to_string() + "\n");
+                            output.push_str(&next_line);
+                            output.push('\n');
                         }
                     }
                     tag_idx += 1;
                 } else {
-                    output_lines.push(line.to_string() + "\n");
+                    output.push_str(&line);
+                    output.push('\n');
                 }
             }
 
-            // 파일 덮어쓰기
-            let mut outfile = File::create(&quiver_file).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-            for line in output_lines {
-                outfile.write_all(line.as_bytes()).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-            }
-
-            let builtins = py.import("builtins")?;
-            builtins.getattr("print")?.call1((format!("✅ Successfully renamed tags in {}", quiver_file),))?;
-
-            Ok(())
+            Ok(output)
         }
         Err(e) => Err(e),
     }
 }
 
-// rs_qvslice 함수 추가
+// rs_qvslice 함수 수정
 #[pyfunction]
-fn rs_qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyResult<()> {
+fn rs_qvslice(_py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyResult<String> {
     let mut tag_list = tags.unwrap_or_else(Vec::new);
 
     // Read tags from stdin if no arguments are provided
@@ -391,11 +386,7 @@ fn rs_qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyR
                 tag_list.extend(stdin_str.trim().split_whitespace().map(String::from));
             }
             Err(e) => {
-                let builtins = py.import("builtins")?;
-                builtins.getattr("print")?.call1((
-                    format!("❌ Error reading from stdin: {}", e),
-                ))?;
-                return Ok(());
+                return Err(pyo3::exceptions::PyIOError::new_err(format!("Error reading from stdin: {}", e)));
             }
         }
     }
@@ -403,11 +394,7 @@ fn rs_qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyR
     // Clean and validate tag list
     tag_list.retain(|tag| !tag.trim().is_empty());
     if tag_list.is_empty() {
-        let builtins = py.import("builtins")?;
-        builtins.getattr("print")?.call1((
-            "❌ No tags provided. Provide tags as arguments or via stdin.",
-        ))?;
-        return Ok(());
+        return Err(pyo3::exceptions::PyValueError::new_err("No tags provided. Provide tags as arguments or via stdin."));
     }
 
     match Quiver::new(quiver_file.clone(), "r".to_string()) {
@@ -415,19 +402,32 @@ fn rs_qvslice(py: Python, quiver_file: String, tags: Option<Vec<String>>) -> PyR
             let tag_list_clone = tag_list.clone();
             match qv.get_struct_list(tag_list_clone) {
                 Ok((qv_lines, found_tags)) => {
-                    let builtins = py.import("builtins")?;
-
+                    let mut output = String::new();
+                    
                     // Warn about missing tags
                     let tag_set: HashSet<_> = found_tags.iter().collect();
                     for tag in &tag_list {
                         if !tag_set.contains(tag) {
-                            builtins.getattr("print")?.call1((format!("⚠️  Tag not found in Quiver file: {}", tag),))?;
+                            output.push_str(&format!("⚠️  Tag not found in Quiver file: {}\n", tag));
                         }
                     }
 
-                    // Output sliced content
-                    builtins.getattr("print")?.call1((qv_lines,))?;
-                    Ok(())
+                    if found_tags.is_empty() {
+                        return Err(pyo3::exceptions::PyValueError::new_err("No matching tags found in Quiver file"));
+                    }
+
+                    // Add the actual qv content with proper formatting
+                    if !qv_lines.is_empty() {
+                        if !output.is_empty() {
+                            output.push_str("\n");  // Add separator between warnings and content
+                        }
+                        output.push_str(&qv_lines);
+                        if !output.ends_with('\n') {
+                            output.push('\n');
+                        }
+                    }
+                    
+                    Ok(output)
                 }
                 Err(e) => Err(pyo3::exceptions::PyIOError::new_err(e)),
             }
@@ -644,8 +644,6 @@ fn rs_extract_selected_pdbs(
     }
 }
 
-
-
 /// A Python module implemented in Rust.
 #[pymodule]
 fn quiver_pdb(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -660,3 +658,5 @@ fn quiver_pdb(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Quiver>()?;
     Ok(())
 }
+
+
