@@ -1,4 +1,4 @@
-name: Python package (with uv sync)
+name: Pytest
 
 on:
   push:

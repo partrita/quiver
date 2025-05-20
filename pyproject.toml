@@ -1,6 +1,6 @@
 [project]
 name = "quiver-pdb"
-version = "0.4.0"
+version = "0.6.0"
 description = "Quiver files are simply one large file with the contents of many smaller files inside of them."
 readme = "README.md"
 authors = [
