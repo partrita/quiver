@@ -1,13 +1,8 @@
 [package]
 name = "quiver-pdb"
-version = "0.4.0"
+version = "0.6.0"
 edition = "2021"
-description = "description"
-license = "Apache License"
-#license-file = "LICENSE.txt"
-repository = "https:repository"
-homepage = "https:repository"
-documentation = "https:repository/blob/main/README.md"
+description = "Quiver files are simply one large file with the contents of many smaller files inside of them."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -16,6 +11,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.24", features = ["extension-module"] }
-# rayon = "1.8"
 num_cpus = "1.16"
-#clap = { version = "4.0", features = ["derive"] }
