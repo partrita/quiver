@@ -18,14 +18,11 @@ def list_tags(quiver_file):
     """
     try:
         tags = rs_list_tags(quiver_file)
-        if not tags:
-            click.secho(f"ℹ️ No tags found in {quiver_file}.", fg="yellow")
-        else:
-            for tag in tags:
-                click.echo(tag)
+        for tag in tags:
+            click.echo(tag)
     except Exception as e:
-        click.secho(f"❌ Error listing tags: {e}", fg="red", err=True)
-        sys.exit(1) # Use sys.exit(1) for errors
+        click.echo(f"Error listing tags: {e}", err=True)
+        raise click.Abort()
 
 
 if __name__ == "__main__":
