@@ -21,7 +21,7 @@ license = "MIT"
 qvfrompdbs = "quiver_pdb.qvfrompdbs:qvfrompdbs"
 qvls = "quiver_pdb.qvls:list_tags"
 qvextract = "quiver_pdb.qvextract:extract_pdbs"
-#qvextractspecific = "quiver_pdb.qvextractspecific:extract_selected_pdbs"
+qvextractspecific = "quiver_pdb.qvextractspecific:extract_selected_pdbs"
 qvscorefile = "quiver_pdb.qvscorefile:extract_scorefile"
 qvrename = "quiver_pdb.qvrename:rename_tags"
 qvsplit = "quiver_pdb.qvsplit:qvsplit"
@@ -30,6 +30,8 @@ qvslice = "quiver_pdb.qvslice:qvslice"
 [build-system]
 requires = ["maturin>=1.8,<2.0"]
 build-backend = "maturin"
+#requires = ["hatchling"]
+#build-backend = "hatchling.build"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

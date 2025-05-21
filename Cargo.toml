@@ -3,6 +3,7 @@ name = "quiver-pdb"
 version = "0.6.0"
 edition = "2021"
 description = "Quiver files are simply one large file with the contents of many smaller files inside of them."
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
