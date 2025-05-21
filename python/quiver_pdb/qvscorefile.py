@@ -18,13 +18,9 @@ def extract_scorefile(qvfile):
     Extracts the scorefile from the provided Quiver file and saves it as a .csv file.
     """
     try:
-        # rs_extract_scorefile now returns the path to the created CSV file.
-        csv_file_path = rs_extract_scorefile(qvfile)
-        click.secho(f"✅ Scorefile written to: {csv_file_path}", fg="green")
+        rs_extract_scorefile(qvfile)
     except Exception as e:
-        # This will catch errors from the Rust layer (PyIOError, PyValueError)
-        # and other Python exceptions.
-        click.secho(f"❌ Error extracting scorefile: {str(e)}", fg="red", err=True)
+        click.secho(f"❌ Error: {str(e)}", fg="red", err=True)
         sys.exit(1)
 
 

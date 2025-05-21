@@ -31,28 +31,19 @@ qvextract my.qv
 qvls my.qv | head -n 10 | qvextractspecific my.qv
 
 # extract a random 10 pdbs from a quiver file
-# `qvextractspecific` reads tags from command-line arguments, or from stdin if no tags are provided as arguments.
 qvls my.qv | shuf | head -n 10 | qvextractspecific my.qv
 
 # extract a specific pdb from a quiver file
 qvextractspecific my.qv name_of_pdb_0001
 
-# produce a scorefile from a quiver file (e.g., my.qv will produce my.csv)
-# The command will print a success message indicating the path to the generated CSV file.
+# produce a scorefile from a quiver file
 qvscorefile my.qv
 
 # combine qv files
 cat 1.qv 2.qv 3.qv > my.qv
 
-# ensure all pdbs in quiver file have unique names (example: make all tags start with "pdb_")
-# Note: `qvrename` modifies the file in-place.
-# The new tags must be provided, matching the number of existing tags.
-# Example: if my.qv has 3 tags, you could do:
-#   (echo "pdb_tag1"; echo "pdb_tag2"; echo "pdb_tag3") | qvrename my.qv
-# Or, more realistically, generate new names with a script:
-#   qvls my.qv | awk '{print "pdb_"NR}' | qvrename my.qv
-# If you want to keep the original and save to a new file, copy it first:
-#   cp my.qv uniq.qv && qvls uniq.qv | awk '{print "pdb_"NR}' | qvrename uniq.qv
+# ensure all pdbs in quiver file have unique names
+qvls my.qv | qvrename my.qv > uniq.qv
 
 # split a quiver file into groups of 100
 qvsplit my.qv 100
@@ -61,19 +52,13 @@ qvsplit my.qv 100
 qvslice big.qv <tag1> <tag2> ... <tagN> > smaller.qv
 ```
 
-## Testing
+## Test
 
-To run the test suite, execute the following command from the project root directory:
+터미널에서 이 파일이 있는 디렉토리 또는 상위 프로젝트 루트에서 다음 명령어를 실행하세요:
 
 ```bash
 uv run pytest
 ```
-
-This will run both Rust unit tests and Python integration tests.
-
-## Performance
-
-The core logic of Quiver tools is implemented in Rust, leveraging its performance characteristics for file I/O and data manipulation. This generally results in faster execution compared to pure Python implementations, especially for large Quiver files or numerous operations. The "Benchmark" section below provides a comparison.
 
 ## Benchmark
 

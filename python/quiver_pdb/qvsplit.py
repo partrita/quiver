@@ -33,15 +33,13 @@ def qvsplit(file, ntags, prefix, output_dir):
         raise click.Abort()
 
     click.secho(f"📂 Reading: {file}", fg="blue")
-    click.secho(f"🔪 Splitting into chunks of {ntags} tags to '{output_dir}' with prefix '{prefix}'...", fg="cyan")
+    click.secho(f"🔪 Splitting into chunks of {ntags} tags...", fg="green")
 
     try:
-        # rs_qvsplit now returns a success message string.
-        success_message = rs_qvsplit(file, ntags, prefix, output_dir)
-        click.secho(success_message, fg="green") # The Rust message already includes "✅"
+        rs_qvsplit(file, ntags, prefix, output_dir)
     except Exception as e:
-        click.secho(f"❌ Error splitting Quiver file: {e}", fg="red", err=True)
-        sys.exit(1) # Use sys.exit(1) for errors
+        click.secho(f"Error splitting Quiver file: {e}", fg="red", err=True)
+        raise click.Abort()
 
 
 if __name__ == "__main__":
