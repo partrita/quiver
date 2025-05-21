@@ -16,6 +16,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.24", features = ["extension-module"] }
+tempfile = "3.10.1"
 # rayon = "1.8"
 num_cpus = "1.16"
 #clap = { version = "4.0", features = ["derive"] }

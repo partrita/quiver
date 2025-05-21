@@ -38,15 +38,25 @@ def qvslice(quiver_file, tags):
         sys.exit(1)
 
     try:
-        result = rs_qvslice(quiver_file, tag_list)
-        # Print warnings to stderr
-        for line in result.splitlines():
-            if line.startswith("⚠️"):
-                click.secho(line, fg="yellow", err=True)
-            else:
-                print(line)
+        # rs_qvslice now returns a single string which includes data and any warnings.
+        # Warnings are already formatted with "⚠️" by the Rust function.
+        # The Python script just needs to print the output.
+        output_str = rs_qvslice(quiver_file, tag_list)
+        if output_str: # Check if the string is not empty
+            # Print the entire string. If it contains newlines, click.echo handles it.
+            # If specific lines (like warnings) need to go to stderr, that logic
+            # would need to be more complex here, or the Rust API would need to
+            # return structured data (e.g., a dict with 'data' and 'warnings' keys).
+            # Given the current Rust API returns a single string with embedded warnings,
+            # we print it all to stdout. The user can redirect stderr if they only want data.
+            click.echo(output_str)
+        else:
+            # This case might occur if Rust returns an empty string on success
+            # (e.g. slice of no tags resulted in no data and no warnings).
+            click.secho("ℹ️  The slice operation resulted in empty output.", fg="yellow")
+
     except Exception as e:
-        click.secho(f"Error slicing Quiver file: {e}", fg="red", err=True)
+        click.secho(f"❌ Error slicing Quiver file: {e}", fg="red", err=True)
         sys.exit(1)
 
 
