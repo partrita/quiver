@@ -4,7 +4,7 @@ This is a command-line tool to extract specific PDB files from a Quiver file
 using the Rust-based `quiver_pdb` module for faster execution.
 
 Usage:
-    qvextractspecific.py [OPTIONS] <quiver_file> [tag1 tag2 ...]
+    qvextractspecific [OPTIONS] <quiver_file> [tag1 tag2 ...]
     cat tags.txt | qvextractspecific.py [OPTIONS] <quiver_file>
 """
 

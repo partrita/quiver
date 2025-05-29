@@ -3,7 +3,7 @@
 This is a command-line tool to extract all PDB files from a Quiver file.
 
 Usage:
-    qvextract.py <quiver_file>
+    qvextract <quiver_file>
 """
 
 import click

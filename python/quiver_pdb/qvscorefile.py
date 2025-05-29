@@ -3,7 +3,7 @@
 This script extracts the scorefile from a Quiver (.qv) file and writes it as a .csv file.
 
 Usage:
-    qvscorefile.py mydesigns.qv
+    qvscorefile mydesigns.qv
 """
 
 import sys

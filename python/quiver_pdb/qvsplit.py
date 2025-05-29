@@ -4,7 +4,7 @@ Split a Quiver (.qv) file into multiple smaller Quiver files,
 each containing a specified number of tags.
 
 Usage:
-    qvsplit.py mydesigns.qv 100
+    qvsplit mydesigns.qv 100
     → produces: split_000.qv, split_001.qv, ...
 """
 

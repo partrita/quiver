@@ -3,7 +3,7 @@
 Slice a specific set of tags from a Quiver file into another Quiver file.
 
 Usage:
-    qvslice.py big.qv tag1 tag2 ... > sliced.qv
+    qvslice big.qv tag1 tag2 ... > sliced.qv
     echo "tag1 tag2" | qvslice.py big.qv > sliced.qv
 """
 

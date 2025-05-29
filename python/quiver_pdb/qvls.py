@@ -3,7 +3,7 @@
 This is a command-line tool to list all the tags in a Quiver file.
 
 Usage:
-    qvls.py <quiver_file>
+    qvls <quiver_file>
 """
 
 import click

@@ -143,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "quiver-pdb"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "num_cpus",
  "pyo3",

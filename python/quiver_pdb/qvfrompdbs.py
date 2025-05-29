@@ -3,7 +3,7 @@
 This tool combines multiple PDB files into a Quiver-compatible stream.
 
 Usage:
-    qvfrompdbs.py <pdb1> <pdb2> ... <pdbN> > output.qv
+    qvfrompdbs *.pdb > output.qv
 """
 
 import sys

@@ -3,7 +3,7 @@
 Rename the tags in a Quiver file using new tags from stdin or command-line arguments.
 
 Usage examples:
-    qvrename.py my.qv tag1_new tag2_new ... > renamed.qv
+    qvrename my.qv tag1_new tag2_new ... > renamed.qv
 """
 
 import sys
