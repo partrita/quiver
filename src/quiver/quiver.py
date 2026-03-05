@@ -11,14 +11,13 @@ import os
 
 
 class Quiver:
-    def __init__(self, filename, mode, backend="txt"):
+    def __init__(self, filename, mode):
         if mode not in ("r", "w"):
             raise ValueError(
                 f"Quiver file must be opened in 'r' or 'w' mode, not '{mode}'"
             )
         self.mode = mode
         self.fn = filename
-        self.backend = backend
         self.tags = self._read_tags()
 
     def _read_tags(self):
