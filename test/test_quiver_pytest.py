@@ -10,7 +10,11 @@ import sys
 import os
 import math
 import uuid
-import pandas as pd
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
 import glob
 import subprocess  # For running external scripts
 import filecmp  # For comparing files more directly
@@ -475,6 +479,7 @@ def test_qvsplit(basedir, tmp_path, input_pdb_files, input_qv_file):
     print("Passed qvsplit test")
 
 
+@pytest.mark.skipif(not HAS_PANDAS, reason="pandas not installed")
 def test_qvrename(basedir):
     """
     Test that qvrename correctly renames the entries of a Quiver file.
@@ -641,3 +646,9 @@ def test_qvextractspecific(basedir):
     # Clean up
     os.chdir(f"{basedir}")
     os.system(f"rm -r {basedir}/test/do_qvextractspecific")
+
+def test_quiver_invalid_mode():
+    """Test that Quiver raises ValueError when initialized with an invalid mode."""
+    with pytest.raises(ValueError) as excinfo:
+        Quiver("test.qv", "x")
+    assert "Quiver file must be opened in 'r' or 'w' mode, not 'x'" in str(excinfo.value)

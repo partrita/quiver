@@ -11,7 +11,11 @@ import sys
 import os
 import math
 import uuid
-import pandas as pd
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
 from quiver import Quiver
 import glob
 
@@ -477,12 +481,39 @@ def test_qvrename(basedir):
     os.system(f"rm -r {basedir}/test/do_qvrename")
 
 
+def test_quiver_invalid_mode(basedir):
+    """Test that Quiver raises ValueError when initialized with an invalid mode."""
+    try:
+        Quiver("test.qv", "x")
+    except ValueError as e:
+        expected_msg = "Quiver file must be opened in 'r' or 'w' mode, not 'x'"
+        if expected_msg not in str(e):
+            raise TestFailed(f"ValueError message mismatch. Expected: {expected_msg}, Got: {e}")
+    except Exception as e:
+        raise TestFailed(f"Expected ValueError, but caught {type(e).__name__}: {e}")
+    else:
+        raise TestFailed("ValueError not raised for invalid mode 'x'")
+
+
 # Run through all the tests, logging which ones fail
 
 # Get the base directory
 basedir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 passed = 0
 total = 0
+
+# Invalid Mode Test
+print("Running invalid mode test")
+try:
+    test_quiver_invalid_mode(basedir)
+    print("Passed invalid mode test")
+    passed += 1
+    total += 1
+except TestFailed as e:
+    print(f"Test with name test_quiver_invalid_mode failed with error: {e}")
+    total += 1
+
+print("\n")
 
 # Zip and Extract Test
 print("Running zip and extract test")
@@ -552,17 +583,19 @@ except TestFailed as e:
 print("\n")
 
 # qvrename Test
-print("Running qvrename test")
-try:
-    test_qvrename(basedir)
-    print("Passed qvrename test")
-    passed += 1
-    total += 1
-except TestFailed as e:
-    print(f"Test with name test_qvrename failed with error: {e}")
-    os.system(f"rm -r {basedir}/test/do_qvrename")
-    total += 1
-
+if HAS_PANDAS:
+    print("Running qvrename test")
+    try:
+        test_qvrename(basedir)
+        print("Passed qvrename test")
+        passed += 1
+        total += 1
+    except TestFailed as e:
+        print(f"Test with name test_qvrename failed with error: {e}")
+        os.system(f"rm -r {basedir}/test/do_qvrename")
+        total += 1
+else:
+    print("Skipping qvrename test (pandas not installed)")
 print("\n")
 
 print("#" * 50)
