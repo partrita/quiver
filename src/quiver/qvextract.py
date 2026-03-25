@@ -20,7 +20,9 @@ def extract_pdbs(quiver_file):
     qv = Quiver(quiver_file, "r")
 
     for tag in qv.get_tags():
-        outfn = f"{tag}.pdb"
+        # Sanitize tag to prevent path traversal
+        safe_tag = os.path.basename(tag)
+        outfn = f"{safe_tag}.pdb"
 
         if os.path.exists(outfn):
             click.echo(f"⚠️  File {outfn} already exists, skipping")

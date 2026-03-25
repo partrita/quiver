@@ -52,7 +52,9 @@ def extract_selected_pdbs(quiver_file, tags, output_dir):
     extracted_count = 0
 
     for tag in unique_tags:
-        outfn = os.path.join(output_dir, f"{tag}.pdb")
+        # Sanitize tag to prevent path traversal
+        safe_tag = os.path.basename(tag)
+        outfn = os.path.join(output_dir, f"{safe_tag}.pdb")
 
         if os.path.exists(outfn):
             click.echo(f"⚠️  File {outfn} already exists, skipping")
